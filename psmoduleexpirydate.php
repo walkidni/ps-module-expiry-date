@@ -35,11 +35,21 @@ class psmoduleexpirydate extends Module
 
     public function install(): bool
     {
-        return parent::install();
+        return parent::install() && $this->installDb();
     }
 
     public function uninstall(): bool
     {
-        return parent::uninstall();
+        return $this->uninstallDb() && parent::uninstall();
+    }
+
+    private function installDb(): bool
+    {
+        return (bool) require __DIR__ . '/sql/install.php';
+    }
+
+    private function uninstallDb(): bool
+    {
+        return (bool) require __DIR__ . '/sql/uninstall.php';
     }
 }
