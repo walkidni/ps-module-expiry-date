@@ -4,6 +4,8 @@ if (!defined('_PS_VERSION_')) {
     exit;
 }
 
+use Doctrine\DBAL\Query\QueryBuilder;
+use PrestaShop\PrestaShop\Core\Grid\Column\Type\Common\DataColumn;
 use PrestaShopBundle\Form\Admin\Type\DatePickerType;
 use PrestaShopBundle\Form\FormBuilderModifier;
 
@@ -43,7 +45,9 @@ class psmoduleexpirydate extends Module
             && $this->registerHook('actionProductFormDataProviderData')
             && $this->registerHook('actionProductFormBuilderModifier')
             && $this->registerHook('actionAfterCreateProductFormHandler')
-            && $this->registerHook('actionAfterUpdateProductFormHandler');
+            && $this->registerHook('actionAfterUpdateProductFormHandler')
+            && $this->registerHook('actionProductGridDefinitionModifier')
+            && $this->registerHook('actionProductGridQueryBuilderModifier');
     }
 
     public function uninstall(): bool
@@ -102,6 +106,43 @@ class psmoduleexpirydate extends Module
                 'modify_all_shops' => true,
             ]
         );
+    }
+
+    public function hookActionProductGridDefinitionModifier(array $params): void
+    {
+        $definition = $params['definition'];
+        $columns = $definition->getColumns();
+
+        foreach ($columns as $column) {
+            if ($column->getId() === 'expiration_date') {
+                return;
+            }
+        }
+
+        $columns->addAfter(
+            'quantity',
+            (new DataColumn('expiration_date'))
+                ->setName($this->trans('Date d\'expiration', [], 'Modules.Psmoduleexpirydate.Admin'))
+                ->setOptions([
+                    'field' => 'expiration_date',
+                ])
+        );
+    }
+
+    public function hookActionProductGridQueryBuilderModifier(array $params): void
+    {
+        /** @var QueryBuilder $searchQueryBuilder */
+        $searchQueryBuilder = $params['search_query_builder'];
+        /** @var QueryBuilder $countQueryBuilder */
+        $countQueryBuilder = $params['count_query_builder'];
+
+        $joinCondition = 'ped.`id_product` = p.`id_product`';
+
+        $searchQueryBuilder
+            ->leftJoin('p', _DB_PREFIX_ . 'psmoduleexpirydate', 'ped', $joinCondition)
+            ->addSelect('ped.`expiration_date` AS `expiration_date`');
+
+        $countQueryBuilder->leftJoin('p', _DB_PREFIX_ . 'psmoduleexpirydate', 'ped', $joinCondition);
     }
 
     public function hookActionAfterCreateProductFormHandler(array $params): void
