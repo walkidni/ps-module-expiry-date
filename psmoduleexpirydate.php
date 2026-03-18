@@ -47,7 +47,8 @@ class psmoduleexpirydate extends Module
             && $this->registerHook('actionAfterCreateProductFormHandler')
             && $this->registerHook('actionAfterUpdateProductFormHandler')
             && $this->registerHook('actionProductGridDefinitionModifier')
-            && $this->registerHook('actionProductGridQueryBuilderModifier');
+            && $this->registerHook('actionProductGridQueryBuilderModifier')
+            && $this->registerHook('displayProductAdditionalInfo');
     }
 
     public function uninstall(): bool
@@ -161,6 +162,24 @@ class psmoduleexpirydate extends Module
         );
     }
 
+    public function hookDisplayProductAdditionalInfo(array $params): string
+    {
+        $productId = $this->extractProductIdFromHookParams($params);
+        $expirationDate = $this->formatExpirationDateForDisplay(
+            $this->getExpirationDateByProductId($productId)
+        );
+
+        if ($expirationDate === null) {
+            return '';
+        }
+
+        $this->context->smarty->assign([
+            'psmoduleexpirydate_expiration_date' => $expirationDate,
+        ]);
+
+        return $this->fetch('module:' . $this->name . '/views/templates/hook/product-expiration.tpl');
+    }
+
     private function getExpirationDateByProductId(?int $productId): ?string
     {
         if (empty($productId)) {
@@ -206,5 +225,38 @@ class psmoduleexpirydate extends Module
         }
 
         return (string) $expirationDate;
+    }
+
+    private function extractProductIdFromHookParams(array $params): ?int
+    {
+        $product = $params['product'] ?? null;
+
+        if (is_array($product) && isset($product['id_product'])) {
+            return (int) $product['id_product'];
+        }
+
+        if (is_object($product) && isset($product->id_product)) {
+            return (int) $product->id_product;
+        }
+
+        if (isset($params['id_product'])) {
+            return (int) $params['id_product'];
+        }
+
+        return null;
+    }
+
+    private function formatExpirationDateForDisplay(?string $expirationDate): ?string
+    {
+        if ($expirationDate === null || $expirationDate === '') {
+            return null;
+        }
+
+        $date = DateTimeImmutable::createFromFormat('Y-m-d', $expirationDate);
+        if ($date === false) {
+            return null;
+        }
+
+        return $date->format('d/m/Y');
     }
 }
